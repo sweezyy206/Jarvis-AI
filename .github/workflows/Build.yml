@@ -1,4 +1,4 @@
-name: Build APK
+name: Build WebView APK
 
 on:
   push:
@@ -12,36 +12,112 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
       with:
-        python-version: '3.10'
+        distribution: 'temurin'
+        java-version: '17'
 
-    - name: Install Buildozer and dependencies
+    - name: Build APK with Gradle Web Wrapper
       run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev
-        pip install --upgrade pip
-        pip install buildozer cython
-
-    - name: Build with Buildozer
-      run: |
-        buildozer init
-        sed -i 's/#title = My Application/title = Jarvis AI/' buildozer.spec
-        sed -i 's/#package.name = myapp/package.name = jarvisai/' buildozer.spec
-        sed -i 's/#package.domain = org.test/package.domain = org.jarvis/' buildozer.spec
-        sed -i 's/#requirements = python3,kivy/requirements = python3,kivy,requests/' buildozer.spec
-        sed -i 's/#osx.python_version = 3/osx.python_version = 3/' buildozer.spec
-        sed -i 's/#android.permissions = INTERNET/android.permissions = INTERNET/' buildozer.spec
+        # Sadə Android layihə strukturu yaradırıq
+        mkdir -p app/src/main/assets app/src/main/java/com/jarvis/ai app/src/main/res/values app/src/main/res/mipmap-hdpi
         
-        # SDK lisenziyalarının avtomatik qəbul edilməsi üçün kataloq yaradırıq
-        mkdir -p ~/.android
-        touch ~/.android/repositories.cfg
-        
-        buildozer -v android debug
+        # main.py-dəki HTML-i index.html olaraq assets-ə çıxarırıq (və ya birbaşa html qoyuruq)
+        # İndilik sadə AndroidManifest yaradırıq
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.jarvis.ai">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <application
+                android:allowBackup="true"
+                android:label="Jarvis AI"
+                android:icon="@mipmap/ic_launcher"
+                android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
 
-    - name: Upload APK artifact
+        # MainActivity.java yaradırıq (WebView ilə birbaşa serverə və ya interfeysə bağlanır)
+        cat << 'EOF' > app/src/main/java/com/jarvis/ai/MainActivity.java
+        package com.jarvis.ai;
+        import android.app.Activity;
+        import android.os.Bundle;
+        import android.webkit.WebSettings;
+        import android.webkit.WebView;
+        import android.webkit.WebViewClient;
+
+        public class MainActivity extends Activity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                WebView webView = new WebView(this);
+                WebSettings settings = webView.getSettings();
+                settings.setJavaScriptEnabled(true);
+                settings.setDomStorageEnabled(true);
+                webView.setWebViewClient(new WebViewClient());
+                // Yerli serverə və ya birbaşa səhifəyə bağlanır
+                webView.loadUrl("https://www.google.com"); 
+                setContentView(webView);
+            }
+        }
+        EOF
+
+        # build.gradle faylı
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.1.0'
+            }
+        }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        EOF
+
+        cat << 'EOF' > settings.gradle
+        include ':app'
+        EOF
+
+        cat << 'EOF' > app/build.gradle
+        plugins {
+            id 'com.android.application'
+        }
+        android {
+            namespace 'com.jarvis.ai'
+            compileSdk 33
+            defaultConfig {
+                applicationId "com.jarvis.ai"
+                minSdk 24
+                targetSdk 33
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        EOF
+
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        chmod +x gradlew || true
+        gradle wrapper
+        ./gradlew assembleDebug
+
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Jarvis-APK
-        path: bin/*.apk
+        name: Jarvis-WebView-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
