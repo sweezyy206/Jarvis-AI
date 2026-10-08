@@ -18,21 +18,16 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Build APK with Gradle Web Wrapper
+    - name: Create Android Project Structure
       run: |
-        # Sadə Android layihə strukturu yaradırıq
-        mkdir -p app/src/main/assets app/src/main/java/com/jarvis/ai app/src/main/res/values app/src/main/res/mipmap-hdpi
+        mkdir -p app/src/main/java/com/jarvis/ai app/src/main/res/values
         
-        # main.py-dəki HTML-i index.html olaraq assets-ə çıxarırıq (və ya birbaşa html qoyuruq)
-        # İndilik sadə AndroidManifest yaradırıq
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.jarvis.ai">
             <uses-permission android:name="android.permission.INTERNET" />
             <application
-                android:allowBackup="true"
                 android:label="Jarvis AI"
-                android:icon="@mipmap/ic_launcher"
                 android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
                 <activity
                     android:name=".MainActivity"
@@ -46,7 +41,6 @@ jobs:
         </manifest>
         EOF
 
-        # MainActivity.java yaradırıq (WebView ilə birbaşa serverə və ya interfeysə bağlanır)
         cat << 'EOF' > app/src/main/java/com/jarvis/ai/MainActivity.java
         package com.jarvis.ai;
         import android.app.Activity;
@@ -64,14 +58,12 @@ jobs:
                 settings.setJavaScriptEnabled(true);
                 settings.setDomStorageEnabled(true);
                 webView.setWebViewClient(new WebViewClient());
-                // Yerli serverə və ya birbaşa səhifəyə bağlanır
-                webView.loadUrl("https://www.google.com"); 
+                webView.loadUrl("https://www.google.com");
                 setContentView(webView);
             }
         }
         EOF
 
-        # build.gradle faylı
         cat << 'EOF' > build.gradle
         buildscript {
             repositories {
@@ -79,7 +71,7 @@ jobs:
                 mavenCentral()
             }
             dependencies {
-                classpath 'com.android.tools.build:gradle:8.1.0'
+                classpath 'com.android.tools.build:gradle:7.4.2'
             }
         }
         allprojects {
@@ -112,9 +104,14 @@ jobs:
         EOF
 
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        chmod +x gradlew || true
-        gradle wrapper
-        ./gradlew assembleDebug
+
+    - name: Build with Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: 7.5
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
