@@ -1,620 +1,169 @@
-name: Build Jarvis WebView APK
+name: Build Jarvis APK
+
 on:
   push:
     branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-- name: Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
-- name: Set up JDK 17
+
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-- name: Create Android Project Structure and Insert Jarvis Code
+
+    - name: Create Android Project Structure and Insert Jarvis App
       run: |
         mkdir -p app/src/main/java/com/jarvis/ai app/src/main/assets app/src/main/res/values
-        # Jarvis-in HTML kodu birbaşa assets qovluğuna yazılır
+        
+        # Sənin göndərdiyin Jarvis HTML/JS interfeysi birbaşa assets qovluğuna yazılır
         cat << 'EOF' > app/src/main/assets/index.html
-        <!--#!/usr/bin/env python3
-# JARVIS - Ultimate Fast, Permanent Storage & System Control Windows App
-import json, os, sys, base64, re, threading, subprocess
-import urllib.request, urllib.error, urllib.parse
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import webview
-# Permanent JSON storage directory
-DATA_DIR = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), ".jarvis_data")
-os.makedirs(DATA_DIR, exist_ok=True)
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
-SESSION_FILE = os.path.join(DATA_DIR, "session.json")
-CHATS_FILE = os.path.join(DATA_DIR, "chats.json")
-def read_json(path, default):
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception: return default
-    return default
-def write_json(path, data):
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception: pass
-KEY = "AQ.Ab8RN6JasOT9ccy3e3vardxFtUgY1LZPm28IfQKvpZu3xTU2LA"
-MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash"]
-SYSTEM = {
-    "az": ("Sen Jarvis adinda, qisa ve deqiq danisan bir Sesli Asistansan. "
-           "1. Eger istifadeci komputerinde bir proqrami (Meselem: Google Chrome, Notepad, Calculator, YouTube, Telegram) acmagi istese, "
-           "cavabinda tam olaraq bu formatda emr yaz: [CMD: proqram_adi_ve_ya_kecid]. "
-           "Meselem: [CMD: chrome], [CMD: notepad], [CMD: calc], [CMD: https://youtube.com]. "
-           "2. Eger sekil editlemek/yaratmaq istese: [IMAGE: etrafli_ingilisce_tesvir]. "
-           "Cavablarin en cox 2-3 cumle olsun ve hemise Azerbaycan dilinde yaz."),
-    "tr": ("Sen Jarvis adinda, kisa ve net konusan bir Turkce sesli asistansin. "
-           "1. Kullanici bir program acmak isterse: [CMD: program_adi]. "
-           "2. Resim dzenlemek/cizmek isterse: [IMAGE: detayli_ingilizce_tanim]. "
-           "Cevaplarin en fazla 2-3 cumle olsun ve daima Turkce yaz."),
-    "en": ("You are Jarvis, a concise voice assistant. "
-           "1. If user asks to open an app/website: [CMD: app_name_or_url]. "
-           "2. If user asks to generate/edit image: [IMAGE: detailed_english_prompt]. "
-           "Keep answers to 2-3 sentences and reply in English."),
-}
-STREAM_API = "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse"
-def system_command_run(cmd_str):
-    cmd = cmd_str.strip().lower()
-    try:
-        if cmd.startswith("http://") or cmd.startswith("https://"):
-            os.system(f'start "" "{cmd}"')
-        elif "chrome" in cmd:
-            subprocess.Popen(["cmd", "/c", "start", "chrome"], shell=True)
-        elif "notepad" in cmd or "bloknot" in cmd:
-            subprocess.Popen(["notepad.exe"])
-        elif "calc" in cmd or "hesab" in cmd:
-            subprocess.Popen(["calc.exe"])
-        elif "explorer" in cmd or "qovluq" in cmd:
-            subprocess.Popen(["explorer.exe"])
-        else:
-            subprocess.Popen(["cmd", "/c", "start", cmd], shell=True)
-    except Exception as e:
-        print("Sistem emri xetasi:", e)
-HTML = """<!DOCTYPE html>
-<html lang="az"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>JARVIS AI</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#05070d;
-  --panel:rgba(13, 18, 30, 0.75);
-  --panel-border:rgba(255, 255, 255, 0.1);
-  --primary:#00f2fe;
-  --primary-glow:rgba(0, 242, 254, 0.35);
-  --bubble-me:linear-gradient(135deg, #00c6ff, #0072ff);
-  --bubble-ai:rgba(20, 28, 45, 0.85);
-  --text:#f1f5f9;
-  --muted:#94a3b8;
-}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;font-family:'Plus Jakarta Sans',-apple-system,sans-serif}
-body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden;height:100vh;transition:background 0.4s ease}
-body::before{
-  content:'';position:fixed;top:-10%;left:50%;transform:translateX(-50%);
-  width:600px;height:300px;background:var(--primary-glow);
-  filter:blur(140px);border-radius:50%;pointer-events:none;z-index:0;
-}
-#loginOverlay{
-  position:fixed;inset:0;background:rgba(5, 7, 13, 0.95);z-index:99;
-  display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(20px);
-}
-.loginCard{
-  width:100%;max-width:390px;background:var(--panel);
-  border:1px solid var(--panel-border);padding:36px 28px;border-radius:28px;
-  box-shadow:0 0 50px var(--primary-glow), inset 0 0 20px rgba(255,255,255,0.02);
-  text-align:center;position:relative;overflow:hidden;
-}
-.loginCard h2{
-  font-family:'Space Grotesk',sans-serif;margin:0 0 8px 0;font-size:32px;font-weight:700;
-  letter-spacing:2px;color:var(--primary);text-shadow:0 0 20px var(--primary-glow);
-}
-.loginCard p{color:var(--muted);font-size:14px;margin-bottom:28px}
-#appContainer{display:none;flex-direction:column;height:100%;width:100%;position:relative;z-index:1}
-#ustbar{display:flex;align-items:center;justify-content:space-between;
-  background:var(--panel);backdrop-filter:blur(20px);border-bottom:1px solid var(--panel-border);
-  padding:14px 22px;flex:0 0 auto}
-#ustbar h1{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0;font-weight:700;letter-spacing:2px;color:var(--primary);text-shadow:0 0 12px var(--primary-glow)}
-#ayarBtn{background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:var(--text);font-size:18px;cursor:pointer;padding:8px 12px;border-radius:14px;transition:0.3s}
-#ayarBtn:hover{background:rgba(255,255,255,0.12);box-shadow:0 0 15px var(--primary-glow)}
-#sohbet{flex:1 1 auto;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
-.balon{max-width:82%;padding:14px 20px;border-radius:20px;line-height:1.55;font-size:15px;word-wrap:break-word;white-space:pre-wrap;box-shadow:0 8px 25px rgba(0,0,0,0.3)}
-.ben{align-self:flex-end;background:var(--bubble-me);color:#fff;border-bottom-right-radius:4px;font-weight:500}
-.ai{align-self:flex-start;background:var(--bubble-ai);border:1px solid var(--panel-border);backdrop-filter:blur(12px);border-bottom-left-radius:4px;color:#e2e8f0}
-.hata{align-self:center;color:#ff6b6b;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.25);padding:10px 20px;border-radius:24px;font-size:13px}
-#durum{color:var(--primary);font-size:13px;padding:0 22px;height:24px;flex:0 0 auto;font-weight:600;letter-spacing:0.5px}
-#altbar{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--panel);backdrop-filter:blur(20px);border-top:1px solid var(--panel-border);flex:0 0 auto}
-#giris{flex:1;font-size:15px;padding:13px 20px;background:rgba(10, 15, 26, 0.75);color:var(--text);border:1px solid var(--panel-border);border-radius:28px;outline:none;transition:0.3s}
-#giris:focus{border-color:var(--primary);box-shadow:0 0 20px var(--primary-glow)}
-.iconBtn{flex:0 0 auto;width:46px;height:46px;border-radius:50%;border:none;background:var(--primary);color:#05070d;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:0.3s;box-shadow:0 0 15px var(--primary-glow);font-weight:bold}
-.iconBtn:hover{transform:scale(1.08);box-shadow:0 0 25px var(--primary-glow)}
-#panel{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:none;z-index:10}
-#panel.acik{display:block}
-#panelIc{position:absolute;top:0;right:0;width:85%;max-width:370px;height:100%;background:#0a0e1a;border-left:1px solid var(--panel-border);padding:26px;overflow-y:auto}
-#panelIc h2{font-family:'Space Grotesk',sans-serif;font-size:22px;margin-top:0;margin-bottom:22px;font-weight:700}
-.grup{margin-bottom:22px;background:rgba(255,255,255,0.02);padding:18px;border-radius:20px;border:1px solid var(--panel-border)}
-.grup label{display:block;font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px}
-.renkler{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px}
-.renkTus{height:42px;border-radius:12px;border:2px solid transparent;cursor:pointer;transition:0.3s;font-size:11px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center}
-.renkTus.secili{border-color:#fff;box-shadow:0 0 15px var(--primary-glow);transform:scale(1.05)}
-.dilTus{padding:9px 15px;border-radius:12px;border:1px solid var(--panel-border);background:rgba(255,255,255,0.04);color:var(--text);margin-right:6px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:500;transition:0.3s}
-.dilTus.secili{background:var(--primary);border-color:var(--primary);color:#05070d;font-weight:700;box-shadow:0 0 12px var(--primary-glow)}
-#kapatBtn{position:absolute;top:22px;left:22px;background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:var(--text);width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer}
-.inputKutusu{width:100%;padding:13px 16px;margin-bottom:14px;background:rgba(10,15,26,0.9);color:var(--text);border:1px solid var(--panel-border);border-radius:14px;outline:none;font-size:14px;transition:0.3s}
-.inputKutusu:focus{border-color:var(--primary);box-shadow:0 0 15px var(--primary-glow)}
-.hesapBtn{width:100%;padding:13px;background:var(--primary);border:none;color:#05070d;border-radius:14px;cursor:pointer;font-weight:700;font-size:14px;margin-bottom:10px;transition:0.3s;box-shadow:0 0 15px var(--primary-glow)}
-.hesapBtn:hover{transform:translateY(-2px);opacity:0.95}
-.chatItem{padding:12px 16px;background:rgba(255,255,255,0.02);border:1px solid var(--panel-border);border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:0.3s}
-.chatItem:hover{background:rgba(255,255,255,0.06)}
-.chatItem.aktiv{border-color:var(--primary);background:rgba(0,242,254,0.1);color:var(--primary);font-weight:700}
-#previewKutusu{display:none;padding:12px 20px;background:var(--panel);align-items:center;justify-content:space-between;border-top:1px solid var(--panel-border)}
-#previewKutusu img{max-height:65px;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.4);border:1px solid var(--panel-border)}
-#previewSil{background:none;border:none;color:#ff6b6b;font-size:22px;cursor:pointer}
-.balon img{max-width:100%;border-radius:14px;margin-top:10px;display:block;border:1px solid var(--panel-border)}
-</style></head><body>
-<div id="loginOverlay">
-  <div class="loginCard">
-    <h2>JARVIS AI</h2>
-    <p id="cardDesc">Giriş etmək üçün məlumatlarınızı daxil edin</p>
-    <input type="text" id="loginUser" class="inputKutusu" placeholder="İstifadəçi adı">
-    <input type="password" id="loginPass" class="inputKutusu" placeholder="Şifrə">
-    <button class="hesapBtn" id="btnOverlayGiris" onclick="overlayGirisYap()">Daxil ol</button>
-    <button class="hesapBtn" id="btnOverlayQeydiyyat" style="background:#1e293b;color:#fff;box-shadow:none" onclick="overlayQeydiyyatOl()">Qeydiyyatdan keç</button>
-  </div>
-</div>
-<div id="appContainer">
-  <div id="ustbar"><h1 id="baslik">JARVIS AI</h1><button id="ayarBtn" onclick="panelAc()">⚙️</button></div>
-  <div id="sohbet"></div>
-  <div id="durum"></div>
-  <div id="previewKutusu">
-    <img id="imgPreview" src="" alt="preview">
-    <button id="previewSil" onclick="sekliSil()">✕</button>
-  </div>
-  <div id="altbar">
-    <button class="iconBtn" id="mikBtn" onclick="dinle()">🎤</button>
-    <button class="iconBtn" id="screenBtn" style="background:#3b82f6" title="Ekran Paylaşımı (Vision)" onclick="ekranPaylas()">📺</button>
-    <button class="iconBtn" id="imgBtn" style="background:#8b5cf6" onclick="document.getElementById('fileInput').click()">🖼️</button>
-    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="seklSecildi(event)">
-    <input id="giris" onkeydown="if(event.key==='Enter')gonder()">
-    <button class="iconBtn" id="gonderBtn" onclick="gonder()">➔</button>
-  </div>
-</div>
-<div id="panel">
-  <div id="panelIc">
-    <button id="kapatBtn" onclick="panelKapat()">✕</button>
-    <h2 id="ayarBaslik">Menyu</h2>
-    <div class="grup">
-      <label id="lblHesapStatus">Hesab</label>
-      <p style="margin:5px 0 14px 0;font-weight:700;color:var(--primary)" id="istifadeciMetni"></p>
-      <button class="hesapBtn" id="btnCixis" style="background:#ef4444;color:#fff;box-shadow:none" onclick="cixisYap()">Çıxış et</button>
-    </div>
-    <div class="grup" id="chatGecmisiBolumu">
-      <button class="hesapBtn" id="btnYeniSohbet" onclick="yeniSohbetAc()">+ Yeni Söhbət</button>
-      <label id="lblGecmisSohbetler" style="margin-top:14px;">Keçmiş Söhbətlər</label>
-      <div id="chatSiyahisi"></div>
-    </div>
-    <div class="grup">
-      <label id="lblArka">Arayüz Mövzusu (Theme)</label>
-      <div class="renkler" id="renkKutu"></div>
-    </div>
-    <div class="grup">
-      <label id="lblDil">Dil</label>
-      <button class="dilTus" id="dilAz" onclick="dilSec('az')">Azərbaycan dili</button>
-      <button class="dilTus" id="dilTr" onclick="dilSec('tr')">Türkçe</button>
-      <button class="dilTus" id="dilEn" onclick="dilSec('en')">English</button>
-    </div>
-  </div>
-</div>
-<script>
-var METIN = {
-  az:{baslik:"JARVIS AI", ayarlar:"Menyu", arka:"Arayüz Mövzusu", dil:"Dil", yertut:"Jarvis-ə sual verin...", sen:"Sən", jarvis:"Jarvis", hata:"Xəta", dusunuyor:"Jarvis düşünür...", dinliyor:"Dinləyirəm...", sesYok:"Səs dəstəklənmir.", sesHata:"Səs xətası.", baglantiYok:"Serverə qoşulmaq olmadı.", btnGiris:"Daxil ol", btnQeydiyyat:"Qeydiyyatdan keç", btnCixis:"Çıxış et", xosGeldin:"Aktiv istifadəçi: ", yeniSohbet:"+ Yeni Söhbət", gecmisSohbetler:"Keçmiş Söhbətlər", yeniSohbetBasliq:"Yeni Söhbət", cardDesc:"Giriş etmək üçün məlumatlarınızı daxil edin", alertBosInput:"İstifadəçi adı və şifrəni doldurun!", alertUserExists:"Bu istifadəçi adı mövcuddur!", alertRegSuccess:"Qeydiyyat uğurludur!", alertLoginSuccess:"Sistemə daxil olundu!", alertLoginError:"Məlumatlar yanlışdır!", ekranHata:"Ekran xətası."},
-  tr:{baslik:"JARVIS AI", ayarlar:"Menü", arka:"Arayüz Teması", dil:"Dil", yertut:"Jarvis'e sorun...", sen:"Sen", jarvis:"Jarvis", hata:"Hata", dusunuyor:"Jarvis düşünüyor...", dinliyor:"Dinliyorum...", sesYok:"Ses desteklenmiyor.", sesHata:"Ses hatası.", baglantiYok:"Sunucuya ulaşılamadı.", btnGiris:"Giriş Yap", btnQeydiyyat:"Kayıt Ol", btnCixis:"Çıkış Yap", xosGeldin:"Aktif kullanıcı: ", yeniSohbet:"+ Yeni Sohbet", gecmisSohbetler:"Geçmiş Sohbetler", yeniSohbetBasliq:"Yeni Sohbet", cardDesc:"Giriş yapmak için bilgilerinizi girin", alertBosInput:"Lütfen bilgileri girin!", alertUserExists:"Kullanıcı zaten var!", alertRegSuccess:"Kayıt başarılı!", alertLoginSuccess:"Giriş yapıldı!", alertLoginError:"Hatalı bilgiler!", ekranHata:"Ekran hatası."},
-  en:{baslik:"JARVIS AI", ayarlar:"Menu", arka:"Interface Theme", dil:"Language", yertut:"Ask Jarvis...", sen:"You", jarvis:"Jarvis", hata:"Error", dusunuyor:"Jarvis thinking...", dinliyor:"Listening...", sesYok:"Not supported.", sesHata:"Voice error.", baglantiYok:"Cannot connect.", btnGiris:"Sign In", btnQeydiyyat:"Sign Up", btnCixis:"Log Out", xosGeldin:"User: ", yeniSohbet:"+ New Chat", gecmisSohbetler:"History", yeniSohbetBasliq:"New Chat", cardDesc:"Enter credentials", alertBosInput:"Fill fields!", alertUserExists:"User exists!", alertRegSuccess:"Registered!", alertLoginSuccess:"Logged in!", alertLoginError:"Invalid info!", ekranHata:"Screen error."}
-};
-var THEMES = [
-  { name: "Cyan", bg: "#05070d", primary: "#00f2fe", glow: "rgba(0, 242, 254, 0.35)", gradient: "linear-gradient(135deg, #00c6ff, #0072ff)" },
-  { name: "Purple", bg: "#090514", primary: "#b06ab3", glow: "rgba(176, 106, 179, 0.35)", gradient: "linear-gradient(135deg, #4568dc, #b06ab3)" },
-  { name: "Emerald", bg: "#040d0a", primary: "#10b981", glow: "rgba(16, 185, 129, 0.35)", gradient: "linear-gradient(135deg, #059669, #10b981)" },
-  { name: "Sunset", bg: "#120805", primary: "#ff7e5f", glow: "rgba(255, 126, 95, 0.35)", gradient: "linear-gradient(135deg, #feb47b, #ff7e5f)" },
-  { name: "Crimson", bg: "#0f0507", primary: "#ff4b1f", glow: "rgba(255, 75, 31, 0.35)", gradient: "linear-gradient(135deg, #ff4b1f, #1fddff)" },
-  { name: "Dark", bg: "#080808", primary: "#ffffff", glow: "rgba(255, 255, 255, 0.2)", gradient: "linear-gradient(135deg, #434343, #000000)" }
-];
-var dil = "az";
-var selectedThemeIdx = 0;
-var aktivUser = null;
-var currentChatId = null;
-var hist = [];
-var mesgul = false;
-var secilenSekilBase64 = null;
-var sohbet = document.getElementById("sohbet");
-var giris = document.getElementById("giris");
-var durum = document.getElementById("durum");
-async function api(path, body){
-  var r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
-  return await r.json();
-}
-async function initSystem(){
-  var s = await api("/auth_check", {});
-  if(s.user){
-    aktivUser = s.user;
-    document.getElementById("loginOverlay").style.display = "none";
-    document.getElementById("appContainer").style.display = "flex";
-    document.getElementById("istifadeciMetni").textContent = METIN[dil].xosGeldin + aktivUser;
-    await chatSiyahisiniYukle();
-  }else{
-    document.getElementById("loginOverlay").style.display = "flex";
-    document.getElementById("appContainer").style.display = "none";
-  }
-}
-function themeUygula(idx){
-  selectedThemeIdx = idx;
-  var t = THEMES[idx] || THEMES[0];
-  document.documentElement.style.setProperty('--bg', t.bg);
-  document.documentElement.style.setProperty('--primary', t.primary);
-  document.documentElement.style.setProperty('--primary-glow', t.glow);
-  document.documentElement.style.setProperty('--bubble-me', t.gradient);
-  renkKutusuOlustur();
-}
-function uygula(){
-  var t = METIN[dil] || METIN["az"];
-  document.getElementById("baslik").textContent = t.baslik;
-  document.getElementById("ayarBaslik").textContent = t.ayarlar;
-  document.getElementById("lblArka").textContent = t.arka;
-  document.getElementById("lblDil").textContent = t.dil;
-  document.getElementById("cardDesc").textContent = t.cardDesc;
-  document.getElementById("loginUser").placeholder = t.sen;
-  document.getElementById("btnOverlayGiris").textContent = t.btnGiris;
-  document.getElementById("btnOverlayQeydiyyat").textContent = t.btnQeydiyyat;
-  document.getElementById("btnCixis").textContent = t.btnCixis;
-  document.getElementById("btnYeniSohbet").textContent = t.yeniSohbet;
-  document.getElementById("lblGecmisSohbetler").textContent = t.gecmisSohbetler;
-  giris.placeholder = t.yertut;
-  document.getElementById("dilAz").classList.toggle("secili", dil==="az");
-  document.getElementById("dilTr").classList.toggle("secili", dil==="tr");
-  document.getElementById("dilEn").classList.toggle("secili", dil==="en");
-  themeUygula(selectedThemeIdx);
-}
-async function overlayGirisYap(){
-  var t = METIN[dil];
-  var u = document.getElementById("loginUser").value.trim();
-  var p = document.getElementById("loginPass").value.trim();
-  var res = await api("/login", {u:u, p:p});
-  if(res.ok){
-    alert(t.alertLoginSuccess);
-    initSystem();
-  }else alert(t.alertLoginError);
-}
-async function overlayQeydiyyatOl(){
-  var t = METIN[dil];
-  var u = document.getElementById("loginUser").value.trim();
-  var p = document.getElementById("loginPass").value.trim();
-  if(!u || !p){ alert(t.alertBosInput); return; }
-  var res = await api("/register", {u:u, p:p});
-  if(res.ok){
-    alert(t.alertRegSuccess);
-    initSystem();
-  }else alert(t.alertUserExists);
-}
-async function cixisYap(){
-  await api("/logout", {});
-  panelKapat();
-  initSystem();
-}
-function seklSecildi(e){
-  var file = e.target.files[0];
-  if(!file) return;
-  var reader = new FileReader();
-  reader.onload = function(evt){
-    secilenSekilBase64 = evt.target.result;
-    document.getElementById("imgPreview").src = secilenSekilBase64;
-    document.getElementById("previewKutusu").style.display = "flex";
-  };
-  reader.readAsDataURL(file);
-}
-function sekliSil(){
-  secilenSekilBase64 = null;
-  document.getElementById("fileInput").value = "";
-  document.getElementById("previewKutusu").style.display = "none";
-}
-async function chatSiyahisiniYukle(){
-  var t = METIN[dil];
-  var res = await api("/get_chats", {});
-  var chats = res.chats || {};
-  var kutu = document.getElementById("chatSiyahisi");
-  kutu.innerHTML = "";
-  var keys = Object.keys(chats).reverse();
-  if(keys.length === 0){ await yeniSohbetAc(); return; }
-  if(!currentChatId || !chats[currentChatId]) currentChatId = keys[0];
-  keys.forEach(function(id){
-    var item = document.createElement("div");
-    item.className = "chatItem" + (id === currentChatId ? " aktiv" : "");
-    item.textContent = chats[id].title || (t.yeniSohbetBasliq + " " + id);
-    item.onclick = function(){ sohbetiSec(id); panelKapat(); };
-    kutu.appendChild(item);
-  });
-  hist = chats[currentChatId].history || [];
-  ekranaYukle();
-}
-async function yeniSohbetAc(){
-  currentChatId = Date.now().toString();
-  hist = [];
-  await api("/save_chat", {id: currentChatId, title: METIN[dil].yeniSohbetBasliq, history: []});
-  await chatSiyahisiniYukle();
-  panelKapat();
-}
-function sohbetiSec(id){
-  currentChatId = id;
-  chatSiyahisiniYukle();
-}
-function ekranaYukle(){
-  var t = METIN[dil];
-  sohbet.innerHTML = "";
-  hist.forEach(function(item){
-    var metinText = "";
-    var imgUrl = item.gen_image || null;
-    item.parts.forEach(function(p){
-      if(p.text) metinText += p.text;
-      if(p.inline_data) imgUrl = "data:" + p.inline_data.mime_type + ";base64," + p.inline_data.data;
-    });
-    if(item.role === "user") ekleEkrana(t.sen, metinText, "ben", imgUrl);
-    else if(item.role === "model") ekleEkrana(t.jarvis, metinText, "ai", imgUrl);
-  });
-}
-function renkKutusuOlustur(){
-  var kutu = document.getElementById("renkKutu");
-  kutu.innerHTML = "";
-  THEMES.forEach(function(tm, idx){
-    var b = document.createElement("button");
-    b.className = "renkTus" + (idx === selectedThemeIdx ? " secili" : "");
-    b.style.background = tm.primary;
-    b.style.color = idx === 5 ? "#fff" : "#000";
-    b.textContent = tm.name;
-    b.onclick = function(){ themeUygula(idx); };
-    kutu.appendChild(b);
-  });
-}
-function dilSec(d){ dil = d; uygula(); }
-function panelAc(){ document.getElementById("panel").classList.add("acik"); }
-function panelKapat(){ document.getElementById("panel").classList.remove("acik"); }
-function ekleEkrana(kim, metin, sinif, imgUrl){
-  var p=document.createElement("div");
-  p.className = "balon " + sinif;
-  p.textContent = metin;
-  if(imgUrl){
-    var img = document.createElement("img");
-    img.src = imgUrl;
-    p.appendChild(img);
-  }
-  sohbet.appendChild(p);
-  p.scrollIntoView({behavior:"smooth", block:"end"});
-  return p;
-}
-function gonder(){
-  var s=giris.value.trim();
-  if(s || secilenSekilBase64){ giris.value=""; sor(s); }
-}
-async function saveCurrentChat(title){
-  await api("/save_chat", {id: currentChatId, title: title, history: hist});
-}
-async function sor(s){
-  var t = METIN[dil];
-  if(mesgul) return;
-  if(!currentChatId) await yeniSohbetAc();
-  mesgul = true;
-  var gonderilecekParts = [];
-  var currentImg = secilenSekilBase64;
-  if(s) gonderilecekParts.push({text: s});
-  if(currentImg){
-    var splitted = currentImg.split(",");
-    var mime = splitted[0].match(/:(.*?);/)[1];
-    var data = splitted[1];
-    gonderilecekParts.push({ inline_data: { mime_type: mime, data: data } });
-  }
-  ekleEkrana(t.sen, s, "ben", currentImg);
-  sekliSil();
-  hist.push({role:"user", parts: gonderilecekParts});
-  durum.textContent = t.dusunuyor;
-  var balon = ekleEkrana(t.jarvis, "", "ai");
-  var tamMetin = "";
-  try{
-    var r = await fetch("/ask", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({history:hist, lang:dil})});
-    var reader = r.body.getReader();
-    var decoder = new TextDecoder("utf-8");
-    durum.textContent = "";
-    while(true){
-      var parca = await reader.read();
-      if(parca.done) break;
-      tamMetin += decoder.decode(parca.value, {stream:true});
-      var imgMatch = tamMetin.match(/\[IMAGE:(.*?)\]/);
-      var genImgUrl = null;
-      var cleanText = tamMetin.replace(/\[CMD:(.*?)\]/g, '');
-      if(imgMatch){
-        var prompt = imgMatch[1].trim();
-        genImgUrl = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) + "?width=1024&height=768&model=flux&nologo=true";
-        cleanText = cleanText.replace(/\[IMAGE:(.*?)\]/g, '').trim();
-      }
-      balon.textContent = cleanText.trim();
-      if(genImgUrl && !balon.querySelector("img")){
-        var img = document.createElement("img");
-        img.src = genImgUrl;
-        balon.appendChild(img);
-      }
-      balon.scrollIntoView({behavior:"smooth", block:"end"});
-    }
-    if(tamMetin){
-      var itemObj = {role:"model", parts:[{text:cleanText}]};
-      if(genImgUrl) itemObj.gen_image = genImgUrl;
-      hist.push(itemObj);
-      await saveCurrentChat(s ? s.substring(0,20) + "..." : "Söhbət");
-    }else{
-      hist.pop(); balon.remove();
-      ekleEkrana(t.hata, t.baglantiYok, "hata");
-    }
-  }catch(e){
-    hist.pop(); balon.remove();
-    durum.textContent = "";
-    ekleEkrana(t.hata, t.baglantiYok, "hata");
-  }
-  durum.textContent = ""; mesgul = false;
-}
-uygula();
-initSystem();
-</script></body></html>
-"""
-def gemini_stream(model, body):
-    req = urllib.request.Request(
-        STREAM_API.format(model), data=body,
-        headers={"Content-Type": "application/json", "x-goog-api-key": KEY, "Accept-Encoding": "identity"})
-    resp = urllib.request.urlopen(req, timeout=15)
-    for raw in resp:
-        line = raw.decode("utf-8", "ignore").strip()
-        if not line.startswith("data:"): continue
-        parca = line[len("data:"):].strip()
-        if not parca or parca == "[DONE]": continue
-        try:
-            d = json.loads(parca)
-            parts = d["candidates"][0]["content"]["parts"]
-            metin = "".join(p.get("text", "") for p in parts)
-        except Exception: continue
-        if metin: yield metin
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, *a): pass
-    def _send(self, code, ctype, data):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-    def do_GET(self):
-        if self.path.split("?")[0] in ("/", "/index.html", "/jarvis.html"):
-            self._send(200, "text/html; charset=utf-8", HTML.encode("utf-8"))
-        else:
-            self._send(404, "text/plain; charset=utf-8", b"yok")
-    def do_POST(self):
-        n = int(self.headers.get("Content-Length", "0"))
-        payload = json.loads(self.rfile.read(n).decode("utf-8")) if n > 0 else {}
-        if self.path == "/auth_check":
-            session = read_json(SESSION_FILE, {})
-            out = json.dumps({"user": session.get("user")})
-            self._send(200, "application/json", out.encode("utf-8"))
-            return
-        elif self.path == "/login":
-            users = read_json(USERS_FILE, {})
-            u, p = payload.get("u"), payload.get("p")
-            if users.get(u) == p:
-                write_json(SESSION_FILE, {"user": u})
-                out = json.dumps({"ok": True})
-            else:
-                out = json.dumps({"ok": False})
-            self._send(200, "application/json", out.encode("utf-8"))
-            return
-        elif self.path == "/register":
-            users = read_json(USERS_FILE, {})
-            u, p = payload.get("u"), payload.get("p")
-            if u in users:
-                out = json.dumps({"ok": False})
-            else:
-                users[u] = p
-                write_json(USERS_FILE, users)
-                write_json(SESSION_FILE, {"user": u})
-                out = json.dumps({"ok": True})
-            self._send(200, "application/json", out.encode("utf-8"))
-            return
-        elif self.path == "/logout":
-            write_json(SESSION_FILE, {})
-            self._send(200, "application/json", b'{"ok":true}')
-            return
-        elif self.path == "/get_chats":
-            session = read_json(SESSION_FILE, {})
-            user = session.get("user")
-            all_chats = read_json(CHATS_FILE, {})
-            user_chats = all_chats.get(user, {}) if user else {}
-            out = json.dumps({"chats": user_chats})
-            self._send(200, "application/json", out.encode("utf-8"))
-            return
-        elif self.path == "/save_chat":
-            session = read_json(SESSION_FILE, {})
-            user = session.get("user")
-            if user:
-                all_chats = read_json(CHATS_FILE, {})
-                if user not in all_chats: all_chats[user] = {}
-                cid = payload.get("id")
-                all_chats[user][cid] = {"title": payload.get("title"), "history": payload.get("history")}
-                write_json(CHATS_FILE, all_chats)
-            self._send(200, "application/json", b'{"ok":true}')
-            return
-        elif self.path == "/ask":
-            hist = payload.get("history", [])[-20:]
-            while hist and hist[0].get("role") != "user": hist = hist[1:]
-            lang = payload.get("lang", "az")
-            if lang not in SYSTEM: lang = "az"
-            body = json.dumps({
-                "system_instruction": {"parts": [{"text": SYSTEM[lang]}]},
-                "contents": hist,
-                "generationConfig": {"maxOutputTokens": 300},
-            }).encode("utf-8")
-            akis, ilk_parca = None, None
-            for model in MODELS:
-                try:
-                    aday = gemini_stream(model, body)
-                    ilk_parca = next(aday)
-                    akis = aday
-                    break
-                except Exception: pass
-            if akis is None:
-                out = json.dumps({"ok": False, "text": "Server cavab vermedi."}, ensure_ascii=False)
-                self._send(200, "application/json; charset=utf-8", out.encode("utf-8"))
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.close_connection = True
-            self.end_headers()
-            full_resp = ilk_parca
-            try:
-                self.wfile.write(ilk_parca.encode("utf-8"))
-                self.wfile.flush()
-                for parca in akis:
-                    full_resp += parca
-                    self.wfile.write(parca.encode("utf-8"))
-                    self.wfile.flush()
-                # Check for CMD instruction and execute
-                cmd_match = re.search(r'\[CMD:(.*?)\]', full_resp)
-                if cmd_match:
-                    cmd_to_run = cmd_match.group(1).strip()
-                    threading.Thread(target=system_command_run, args=(cmd_to_run,), daemon=True).start()
-            except Exception: pass
-def start_server():
-    srv = ThreadingHTTPServer(("127.0.0.1", 8008), Handler)
-    srv.serve_forever()
-if _name_ == "_main_":
-    t = threading.Thread(target=start_server, daemon=True)
-    t.start()
-    webview.create_window('JARVIS AI', 'http://127.0.0.1:8008', width=1000, height=750)
-    webview.start()->
         <!DOCTYPE html>
-        <html lang="az">
-        <head>
-            <meta charset="utf-8">
-            <title>JARVIS AI</title>
-            <style>
-                body { background: #05070d; color: #fff; font-family: sans-serif; text-align: center; padding-top: 50px; }
-                h1 { color: #00f2fe; }
-            </style>
-        </head>
-        <body>
-            <h1>JARVIS AI Mobil</h1>
-            <p>Sənin kodun uğurla işləyir!</p>
-        </body>
-        </html>
+        <html lang="az"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+        <title>JARVIS AI</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+        :root{
+          --bg:#05070d;
+          --panel:rgba(13, 18, 30, 0.75);
+          --panel-border:rgba(255, 255, 255, 0.1);
+          --primary:#00f2fe;
+          --primary-glow:rgba(0, 242, 254, 0.35);
+          --bubble-me:linear-gradient(135deg, #00c6ff, #0072ff);
+          --bubble-ai:rgba(20, 28, 45, 0.85);
+          --text:#f1f5f9;
+          --muted:#94a3b8;
+        }
+        *{box-sizing:border-box}
+        html,body{height:100%;margin:0;font-family:'Plus Jakarta Sans',-apple-system,sans-serif}
+        body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden;height:100vh;transition:background 0.4s ease}
+        body::before{
+          content:'';position:fixed;top:-10%;left:50%;transform:translateX(-50%);
+          width:600px;height:300px;background:var(--primary-glow);
+          filter:blur(140px);border-radius:50%;pointer-events:none;z-index:0;
+        }
+        #loginOverlay{
+          position:fixed;inset:0;background:rgba(5, 7, 13, 0.95);z-index:99;
+          display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(20px);
+        }
+        .loginCard{
+          width:100%;max-width:390px;background:var(--panel);
+          border:1px solid var(--panel-border);padding:36px 28px;border-radius:28px;
+          box-shadow:0 0 50px var(--primary-glow), inset 0 0 20px rgba(255,255,255,0.02);
+          text-align:center;position:relative;overflow:hidden;
+        }
+        .loginCard h2{
+          font-family:'Space Grotesk',sans-serif;margin:0 0 8px 0;font-size:32px;font-weight:700;
+          letter-spacing:2px;color:var(--primary);text-shadow:0 0 20px var(--primary-glow);
+        }
+        .loginCard p{color:var(--muted);font-size:14px;margin-bottom:28px}
+        #appContainer{display:flex;flex-direction:column;height:100%;width:100%;position:relative;z-index:1}
+        #ustbar{display:flex;align-items:center;justify-content:space-between;
+          background:var(--panel);backdrop-filter:blur(20px);border-bottom:1px solid var(--panel-border);
+          padding:14px 22px;flex:0 0 auto}
+        #ustbar h1{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0;font-weight:700;letter-spacing:2px;color:var(--primary);text-shadow:0 0 12px var(--primary-glow)}
+        #ayarBtn{background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:var(--text);font-size:18px;cursor:pointer;padding:8px 12px;border-radius:14px;transition:0.3s}
+        #sohbet{flex:1 1 auto;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+        .balon{max-width:82%;padding:14px 20px;border-radius:20px;line-height:1.55;font-size:15px;word-wrap:break-word;white-space:pre-wrap;box-shadow:0 8px 25px rgba(0,0,0,0.3)}
+        .ben{align-self:flex-end;background:var(--bubble-me);color:#fff;border-bottom-right-radius:4px;font-weight:500}
+        .ai{align-self:flex-start;background:var(--bubble-ai);border:1px solid var(--panel-border);backdrop-filter:blur(12px);border-bottom-left-radius:4px;color:#e2e8f0}
+        .hata{align-self:center;color:#ff6b6b;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.25);padding:10px 20px;border-radius:24px;font-size:13px}
+        #durum{color:var(--primary);font-size:13px;padding:0 22px;height:24px;flex:0 0 auto;font-weight:600;letter-spacing:0.5px}
+        #altbar{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--panel);backdrop-filter:blur(20px);border-top:1px solid var(--panel-border);flex:0 0 auto}
+        #giris{flex:1;font-size:15px;padding:13px 20px;background:rgba(10, 15, 26, 0.75);color:var(--text);border:1px solid var(--panel-border);border-radius:28px;outline:none;transition:0.3s}
+        #giris:focus{border-color:var(--primary);box-shadow:0 0 20px var(--primary-glow)}
+        .iconBtn{flex:0 0 auto;width:46px;height:46px;border-radius:50%;border:none;background:var(--primary);color:#05070d;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:0.3s;box-shadow:0 0 15px var(--primary-glow);font-weight:bold}
+        #panel{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:none;z-index:10}
+        #panel.acik{display:block}
+        #panelIc{position:absolute;top:0;right:0;width:85%;max-width:370px;height:100%;background:#0a0e1a;border-left:1px solid var(--panel-border);padding:26px;overflow-y:auto}
+        #panelIc h2{font-family:'Space Grotesk',sans-serif;font-size:22px;margin-top:0;margin-bottom:22px;font-weight:700}
+        .grup{margin-bottom:22px;background:rgba(255,255,255,0.02);padding:18px;border-radius:20px;border:1px solid var(--panel-border)}
+        .grup label{display:block;font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+        .renkler{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px}
+        .renkTus{height:42px;border-radius:12px;border:2px solid transparent;cursor:pointer;transition:0.3s;font-size:11px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center}
+        .dilTus{padding:9px 15px;border-radius:12px;border:1px solid var(--panel-border);background:rgba(255,255,255,0.04);color:var(--text);margin-right:6px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:500}
+        .dilTus.secili{background:var(--primary);border-color:var(--primary);color:#05070d;font-weight:700}
+        #kapatBtn{position:absolute;top:22px;left:22px;background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:var(--text);width:38px;height:38px;border-radius:50%;font-size:16px;cursor:pointer}
+        .inputKutusu{width:100%;padding:13px 16px;margin-bottom:14px;background:rgba(10,15,26,0.9);color:var(--text);border:1px solid var(--panel-border);border-radius:14px;outline:none;font-size:14px}
+        .hesapBtn{width:100%;padding:13px;background:var(--primary);border:none;color:#05070d;border-radius:14px;cursor:pointer;font-weight:700;font-size:14px;margin-bottom:10px}
+        .balon img{max-width:100%;border-radius:14px;margin-top:10px;display:block;border:1px solid var(--panel-border)}
+        </style></head><body>
+        <div id="appContainer">
+          <div id="ustbar"><h1>JARVIS AI</h1><button id="ayarBtn" onclick="panelAc()">⚙️</button></div>
+          <div id="sohbet"></div>
+          <div id="durum"></div>
+          <div id="altbar">
+            <input id="giris" placeholder="Jarvis-ə sual verin..." onkeydown="if(event.key==='Enter')gonder()">
+            <button class="iconBtn" onclick="gonder()">➔</button>
+          </div>
+        </div>
+        <div id="panel">
+          <div id="panelIc">
+            <button id="kapatBtn" onclick="panelKapat()">✕</button>
+            <h2>Menyu</h2>
+            <div class="grup">
+              <label>API Key (Gemini)</label>
+              <input type="password" id="apiKeyInput" class="inputKutusu" placeholder="API Key daxil edin">
+              <button class="hesapBtn" onclick="ApiKeyYaddaSaxla()">Yadda saxla</button>
+            </div>
+          </div>
+        </div>
+        <script>
+        var KEY = localStorage.getItem("jarvis_key") || "AQ.Ab8RN6JasOT9ccy3e3vardxFtUgY1LZPm28IfQKvpZu3xTU2LA";
+        if(document.getElementById("apiKeyInput")) document.getElementById("apiKeyInput").value = KEY;
+        function ApiKeyYaddaSaxla(){
+          KEY = document.getElementById("apiKeyInput").value.trim();
+          localStorage.setItem("jarvis_key", KEY);
+          alert("API Key yadda saxlandı!");
+          panelKapat();
+        }
+        var sohbet = document.getElementById("sohbet");
+        var giris = document.getElementById("giris");
+        var durum = document.getElementById("durum");
+        var hist = [];
+        function panelAc(){ document.getElementById("panel").classList.add("acik"); }
+        function panelKapat(){ document.getElementById("panel").classList.remove("acik"); }
+        function ekleEkrana(kim, metin, sinif){
+          var p=document.createElement("div");
+          p.className = "balon " + sinif;
+          p.textContent = metin;
+          sohbet.appendChild(p);
+          p.scrollIntoView({behavior:"smooth", block:"end"});
+          return p;
+        }
+        async function gonder(){
+          var s = giris.value.trim();
+          if(!s) return;
+          giris.value = "";
+          ekleEkrana("Sən", s, "ben");
+          hist.push({role:"user", parts:[{text:s}]});
+          durum.textContent = "Jarvis düşünür...";
+          var balon = ekleEkrana("Jarvis", "", "ai");
+          try{
+            var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + KEY, {
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({contents: hist})
+            });
+            var data = await r.json();
+            var cevap = data.candidates[0].content.parts[0].text;
+            balon.textContent = cevap;
+            hist.push({role:"model", parts:[{text:cevap}]});
+          }catch(e){
+            balon.textContent = "Xəta baş verdi: API açarını yoxlayın.";
+          }
+          durum.textContent = "";
+        }
+        </script></body></html>
         EOF
+
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.jarvis.ai">
@@ -633,6 +182,7 @@ if _name_ == "_main_":
             </application>
         </manifest>
         EOF
+
         cat << 'EOF' > app/src/main/java/com/jarvis/ai/MainActivity.java
         package com.jarvis.ai;
         import android.app.Activity;
@@ -640,6 +190,7 @@ if _name_ == "_main_":
         import android.webkit.WebSettings;
         import android.webkit.WebView;
         import android.webkit.WebViewClient;
+
         public class MainActivity extends Activity {
             @Override
             protected void onCreate(Bundle savedInstanceState) {
@@ -650,12 +201,12 @@ if _name_ == "_main_":
                 settings.setDomStorageEnabled(true);
                 settings.setDatabaseEnabled(true);
                 webView.setWebViewClient(new WebViewClient());
-                // Lokal assets qovluğundakı index.html-i yükləyir
                 webView.loadUrl("file:///android_asset/index.html");
                 setContentView(webView);
             }
         }
         EOF
+
         cat << 'EOF' > build.gradle
         buildscript {
             repositories {
@@ -673,9 +224,11 @@ if _name_ == "_main_":
             }
         }
         EOF
+
         cat << 'EOF' > settings.gradle
         include ':app'
         EOF
+
         cat << 'EOF' > app/build.gradle
         plugins {
             id 'com.android.application'
@@ -692,14 +245,18 @@ if _name_ == "_main_":
             }
         }
         EOF
+
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-- name: Build with Gradle
+
+    - name: Build with Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: 7.5
-- name: Build Debug APK
+
+    - name: Build Debug APK
       run: gradle assembleDebug
-- name: Upload APK
+
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Jarvis-WebView-APK
